@@ -1,0 +1,45 @@
+name: Build on Ubuntu Latest
+
+on:
+  push:
+    tags:
+      - 'v*'
+      
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "The job was automatically triggered by a ${{ github.event_name }} event."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: List files in the repository
+        run: |
+          ls ${{ github.workspace }}
+      - name: Install required packages
+        run: sudo apt install libgtk-3-dev libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: build 
+        run: cmake .; make
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: list
+        run: |
+          ls ${{ github.workspace }}
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./open-pipe-media-player
+          asset_name: open-pipe-media-player
+          asset_content_type: application/prs.implied-executable
