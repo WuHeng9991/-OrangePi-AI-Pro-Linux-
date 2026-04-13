@@ -1,0 +1,7 @@
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/open-pipe-media-player.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/edit_cache.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/rebuild_cache.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/list_install_components.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/install.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/install/local.dir
+/home/HwHiAiUser/Desktop/AV Project/OrangePi-AI-Pro-Linux--main/build-on/CMakeFiles/install/strip.dir
