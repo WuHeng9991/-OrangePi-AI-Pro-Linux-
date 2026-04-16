@@ -3,6 +3,7 @@
 #include "pipeline.h"
 #include "player.h"
 
+#ifdef HWACC_ENABLED
 static gboolean prefer_gtksink_video_output(void) {
   const gchar *value;
 
@@ -15,6 +16,33 @@ static gboolean prefer_gtksink_video_output(void) {
       g_ascii_strcasecmp(value, "true") == 0 ||
       g_ascii_strcasecmp(value, "yes") == 0 ||
       g_ascii_strcasecmp(value, "on") == 0;
+}
+#endif
+
+static const gchar *friendly_error_status(const gchar *source_name, const GError *err) {
+  if (err == NULL || err->message == NULL) {
+    return "播放失败";
+  }
+
+  if (source_name != NULL && g_strcmp0(source_name, "source") == 0) {
+    return "媒体无法播放";
+  }
+
+  if (g_strrstr(err->message, "No such file") != NULL ||
+      g_strrstr(err->message, "not found") != NULL) {
+    return "找不到媒体文件";
+  }
+
+  if (g_strrstr(err->message, "Permission denied") != NULL) {
+    return "没有权限访问该媒体";
+  }
+
+  if (g_strrstr(err->message, "Could not open") != NULL ||
+      g_strrstr(err->message, "Failed to open") != NULL) {
+    return "打开媒体失败";
+  }
+
+  return "播放失败";
 }
 
 static GstElement *create_audio_sink(CustomData *data) {
@@ -157,26 +185,29 @@ void pipeline_handle_message(CustomData *data, GstMessage *msg) {
   debug_info = NULL;
 
   switch (GST_MESSAGE_TYPE(msg)) {
-    case GST_MESSAGE_ERROR:
+    case GST_MESSAGE_ERROR: {
+      const gchar *src_name;
+      const gchar *status;
+
       gst_message_parse_error(msg, &err, &debug_info);
+      src_name = GST_OBJECT_NAME(msg->src);
       app_debug_log(data, "BUS", "收到 ERROR：src=%s err=%s debug=%s",
-          GST_OBJECT_NAME(msg->src),
+          src_name,
           err != NULL ? err->message : "none",
           debug_info != NULL ? debug_info : "none");
-      g_printerr("Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
+      g_printerr("Error received from element %s: %s\n", src_name, err->message);
       g_printerr("Debugging information: %s\n", debug_info ? debug_info : "none");
       data->playing = FALSE;
       data->is_seeking = FALSE;
       data->seek_done = TRUE;
       data->seek_resume_playback = FALSE;
-      if (g_strcmp0(GST_OBJECT_NAME(msg->src), "source") == 0) {
-        app_set_status(data, "播放失败");
-      } else {
-        app_set_status(data, err->message);
-      }
+      data->last_seek_request_time_us = 0;
+      status = friendly_error_status(src_name, err);
+      app_set_status(data, status);
       g_clear_error(&err);
       g_free(debug_info);
       break;
+    }
     case GST_MESSAGE_EOS:
       app_debug_log(data, "BUS", "收到 EOS");
       g_print("\nEnd-Of-Stream reached.\n");
@@ -184,8 +215,9 @@ void pipeline_handle_message(CustomData *data, GstMessage *msg) {
       data->is_seeking = FALSE;
       data->seek_done = TRUE;
       data->seek_resume_playback = FALSE;
+      data->last_seek_request_time_us = 0;
       data->position = data->duration;
-      app_set_status(data, "播放结束");
+      app_handle_eos(data);
       break;
     case GST_MESSAGE_DURATION_CHANGED:
       app_debug_log(data, "BUS", "收到 DURATION_CHANGED");
@@ -281,9 +313,9 @@ void pipeline_handle_message(CustomData *data, GstMessage *msg) {
         data->playing = FALSE;
       }
 
-      query = gst_query_new_seeking(GST_FORMAT_TIME);//查询当前媒体是否能拖动
-      if (gst_element_query(data->pipeline, query)) { //能拖动多少
-        gst_query_parse_seeking(query, NULL, &data->seek_enabled, &start, &end); // 取出刚刚获得的信息
+      query = gst_query_new_seeking(GST_FORMAT_TIME);
+      if (gst_element_query(data->pipeline, query)) {
+        gst_query_parse_seeking(query, NULL, &data->seek_enabled, &start, &end);
         if (data->seek_enabled) {
           g_print("Seeking is ENABLED from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT "\n",
               GST_TIME_ARGS(start), GST_TIME_ARGS(end));
@@ -299,6 +331,7 @@ void pipeline_handle_message(CustomData *data, GstMessage *msg) {
         data->is_seeking = FALSE;
         data->seek_done = TRUE;
         data->seek_resume_playback = FALSE;
+        data->last_seek_request_time_us = 0;
       }
 
       app_debug_log(data, "BUS", "收到 STATE_CHANGED old=%s new=%s pending=%s",
